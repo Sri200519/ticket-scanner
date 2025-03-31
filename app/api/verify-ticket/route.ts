@@ -89,7 +89,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           valid: true,
           details: {
-            phoneNumber: ticketData?.phone_number || "No email provided",
+            emailAddress: ticketData?.email_address || "No email provided",
             eventName: ticketData?.event_name || "No event name provided",
             buyerName: ticketData?.buyer_name || "Unknown buyer", // Added buyerName to the response
           },
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           valid: false,
           details: {
-            phoneNumber: "Ticket not found in database",
+            emailAddress: "Ticket not found in database",
           },
         })
       }
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
           valid: false,
           error: "Database query error",
           details: {
-            phoneNumber: "Error querying database",
+            emailAddress: "Error querying database",
           },
         },
         { status: 500 },
@@ -123,7 +123,7 @@ export async function POST(request: Request) {
         valid: false,
         error: "Server error",
         details: {
-          phoneNumber: error instanceof Error ? error.message : "Unknown server error",
+          emailAddress: error instanceof Error ? error.message : "Unknown server error",
         },
       },
       { status: 500 },

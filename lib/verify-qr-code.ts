@@ -6,7 +6,7 @@
 export async function verifyQrCode(ticketId: string): Promise<{
   valid: boolean
   details?: {
-    phoneNumber?: string
+    emailAddress?: string
     eventName?: string
     buyerName?: string // Added buyerName to the result details
   }
@@ -31,7 +31,7 @@ export async function verifyQrCode(ticketId: string): Promise<{
       return {
         valid: false,
         details: {
-          phoneNumber: `Server error: ${response.status}`,
+          emailAddress: `Server error: ${response.status}`,
         },
       }
     }
@@ -54,7 +54,7 @@ export async function verifyQrCode(ticketId: string): Promise<{
     return {
       valid: false,
       details: {
-        phoneNumber: error instanceof Error ? error.message : "Unknown error",
+        emailAddress: error instanceof Error ? error.message : "Unknown error",
       },
     }
   }

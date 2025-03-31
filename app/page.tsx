@@ -12,7 +12,7 @@ export default function Home() {
     valid: boolean
     data: string
     details?: {
-      phoneNumber?: string
+      emailAddress?: string
       eventName?: string
       buyerName?: string // Add buyer name field
     }
@@ -43,7 +43,7 @@ export default function Home() {
         setResult({
           valid: false,
           data,
-          details: { phoneNumber: "Error verifying ticket" },
+          details: { emailAddress: "Error verifying ticket" },
         })
       } finally {
         setLoading(false)
@@ -97,7 +97,7 @@ export default function Home() {
                         <strong className="text-red-600">Buyer:</strong> {result.details.buyerName || "N/A"}
                       </p>
                       <p className="text-xl text-white">
-                        <strong className="text-red-600">Number:</strong> {result.details.phoneNumber || "No phone number provided"}
+                        <strong className="text-red-600">Email:</strong> {result.details.emailAddress || "No email provided"}
                       </p>
                       <p className="text-xl text-white">
                         <strong className="text-red-600">Event:</strong> {result.details.eventName || "No event name provided"}
