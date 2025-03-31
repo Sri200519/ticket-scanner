@@ -1,5 +1,5 @@
 "use client"
-import { use, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Camera, Check, X } from "lucide-react"
@@ -14,7 +14,7 @@ export default function Home() {
     details?: {
       emailAddress?: string
       eventName?: string
-      buyerName?: string // Add buyer name field
+      buyerName?: string
     }
   } | null>(null)
   const [loading, setLoading] = useState(false)
@@ -23,15 +23,8 @@ export default function Home() {
     if (data && !loading) {
       setLoading(true)
       setScanning(false)
-
-      console.log("QR Code scanned:", data)
-
       try {
-        // Call your verification function with the QR code data (ticket ID)
-        console.log("Sending for verification...")
         const verificationResult = await verifyQrCode(data)
-        console.log("Verification result:", verificationResult)
-
         setResult({
           valid: verificationResult.valid,
           data,
@@ -39,7 +32,6 @@ export default function Home() {
         })
       } catch (error) {
         console.error("Error verifying QR code:", error)
-        // Still set a result even if there's an error
         setResult({
           valid: false,
           data,
@@ -78,28 +70,20 @@ export default function Home() {
             <div className="space-y-4">
               <div className={`flex flex-col p-6 rounded-lg ${result.valid ? "bg-green-500" : "bg-red-500"}`}>
                 <div className="flex items-center mb-4">
-                  {result.valid ? (
-                    <Check className="h-10 w-10 text-white mr-4" />
-                  ) : (
-                    <X className="h-10 w-10 text-white mr-4" />
-                  )}
-                  <h3 className="text-xl font-semibold text-white">
-                    {result.valid ? "Valid Ticket" : "Invalid Ticket"}
-                  </h3>
+                  {result.valid ? <Check className="h-10 w-10 text-white mr-4" /> : <X className="h-10 w-10 text-white mr-4" />}
+                  <h3 className="text-xl font-semibold text-white">{result.valid ? "Valid Ticket" : "Invalid Ticket"}</h3>
                 </div>
-
                 <div className="text-lg font-medium text-white">
-                  <p className="text-gray-200">Ticket ID: <span className="font-bold">{result.data}</span></p>
-
+                  <p className="text-gray-200">Ticket ID: <span className="font-bold break-all">{result.data}</span></p>
                   {result.valid && result.details && (
                     <div className="mt-4 space-y-2 bg-gray-800 p-4 rounded-lg shadow-md">
-                      <p className="text-xl text-white">
+                      <p className="text-lg text-white truncate max-w-full overflow-hidden text-ellipsis">
                         <strong className="text-red-600">Buyer:</strong> {result.details.buyerName || "N/A"}
                       </p>
-                      <p className="text-xl text-white">
-                        <strong className="text-red-600">Email:</strong> {result.details.emailAddress || "No email provided"}
+                      <p className="text-lg text-white truncate max-w-full overflow-hidden text-ellipsis">
+                        <strong className="text-red-600">Email:</strong> <span className="break-all">{result.details.emailAddress || "No email provided"}</span>
                       </p>
-                      <p className="text-xl text-white">
+                      <p className="text-lg text-white truncate max-w-full overflow-hidden text-ellipsis">
                         <strong className="text-red-600">Event:</strong> {result.details.eventName || "No event name provided"}
                       </p>
                     </div>
