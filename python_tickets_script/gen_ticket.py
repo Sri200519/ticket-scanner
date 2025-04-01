@@ -8,7 +8,7 @@ import ssl
 from email.message import EmailMessage
 
 # Initialize Firebase Admin SDK
-cred = credentials.Certificate("/Users/srikar/mirchi-tickets/mirchi-ticket-website.json")  # Path to your Firebase key JSON
+cred = credentials.Certificate("/Users/srikar/mirchi-ticket-website/mirchi-ticket-website.json")  # Path to your Firebase key JSON
 firebase_admin.initialize_app(cred)
 
 # Reference to Firestore database
