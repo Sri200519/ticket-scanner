@@ -6,15 +6,25 @@ import os
 import smtplib
 import ssl
 from email.message import EmailMessage
+import gspread
+from google.oauth2.service_account import Credentials
 
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate("/Users/srikar/mirchi-ticket-website/mirchi-ticket-website.json")  # Path to your Firebase key JSON
+cred = credentials.Certificate("/Users/srikar/mirchi-ticket-website/mirchi-ticket-website.json")
 firebase_admin.initialize_app(cred)
 
-# Reference to Firestore database
 db = firestore.client()
 
-# Create a folder to store the QR code images
+# Google Sheets API Setup
+SHEET_ID = "1kFzDXgzm5XrCbr7zvJd5vWgVyjdlfTBHZYReowJefqE"  # Google Sheet ID
+SHEET_NAME = "Form Responses 1"   # sheet's tab name
+
+google_credentials = Credentials.from_service_account_file(
+    "/Users/srikar/mirchi-ticket-website/google-sheets-key.json",
+    scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+)
+gc = gspread.authorize(google_credentials)
+sheet = gc.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
+
 if not os.path.exists("tickets"):
     os.makedirs("tickets")
 
@@ -33,7 +43,6 @@ def generate_qr_code(ticket_id):
     qr.add_data(ticket_id)
     qr.make(fit=True)
 
-    # Create an image from the QR code
     qr_image_path = f"tickets/ticket_{ticket_id}.png"
     img = qr.make_image(fill='black', back_color='white')
     img.save(qr_image_path)
@@ -54,42 +63,71 @@ def save_ticket_to_db(ticket_id, email_address, event_name, buyer_name, qr_code_
 
 def send_email_with_qr(email_address, event_name, buyer_name, qr_image_path):
     """Send an email with the QR code attached."""
-    sender_email = "skopparapu19@gmail.com"  # Replace with your email
-    sender_password = "dwfs wafe lqpz mxny"  # Use an app password if using Gmail
+    sender_email = "skopparapu19@gmail.com"  
+    sender_password = "dwfs wafe lqpz mxny" 
     subject = f"Your Ticket for {event_name}"
-    
-    # Create the email
+
     msg = EmailMessage()
     msg["From"] = sender_email
     msg["To"] = email_address
     msg["Subject"] = subject
-    msg.set_content(f"Dear {buyer_name},\n\nThank you for purchasing your ticket for {event_name}.\n\nAttached is your QR code for entry.\n\nBest regards,\Mass Mirchi")
+    msg.set_content(f"Dear {buyer_name},\n\nThank you for purchasing your ticket for {event_name}.\n\nAttached is your QR code for entry.\n\nBest regards,\nMass Mirchi")
 
-    # Attach QR code image
     with open(qr_image_path, "rb") as f:
         img_data = f.read()
         msg.add_attachment(img_data, maintype="image", subtype="png", filename=f"ticket_{event_name}.png")
 
-    # Send email
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender_email, sender_password)
         server.send_message(msg)
-    
+
     print(f"Email sent to {email_address} with QR code attachment.")
 
-def generate_ticket(email_address, event_name, buyer_name):
+def update_sheet_status(row_index):
+    """Mark the email as sent in the 'Sent' column."""
+    sheet.update_cell(row_index, sent_idx + 1, "Yes")  # Adding 1 because Sheets is 1-indexed
+
+def generate_ticket(email_address, event_name, buyer_name, row_index):
     """Generate a ticket, save QR code, store details in Firestore, and send an email."""
     ticket_id = generate_ticket_id()
     qr_image_path = generate_qr_code(ticket_id)
 
-    # Save ticket details to Firestore
     save_ticket_to_db(ticket_id, email_address, event_name, buyer_name, qr_image_path)
 
-    # Send the QR code via email
     send_email_with_qr(email_address, event_name, buyer_name, qr_image_path)
+
+    update_sheet_status(row_index)
 
     print(f"Ticket generated and emailed successfully! Ticket ID: {ticket_id}")
 
-# Example usage
-generate_ticket(email_address="srikar.kopparapu19@gmail.com", event_name="Spoke", buyer_name="Srikar Kopparapu")
+def process_verified_tickets():
+    """Reads Google Sheet, filters verified payments, and processes ticket generation."""
+    data = sheet.get_all_values() 
+    headers = data[0]  
+    rows = data[1:] 
+
+    email_idx = headers.index("Email - your ticket will be sent here, double check this!!!")
+    name_idx = headers.index("Full Name (ticket is attached to this name only)")
+    payment_idx = headers.index("Verified")  
+
+    global sent_idx
+    if "Sent" not in headers:
+        headers.append("Sent")
+        sheet.append_row(headers)  
+        sent_idx = len(headers) - 1
+    else:
+        sent_idx = headers.index("Sent")
+
+    for i, row in enumerate(rows, start=2):  
+        payment_verified = row[payment_idx].strip().lower()
+        email_sent = row[sent_idx].strip().lower() if len(row) > sent_idx else ""
+
+        if payment_verified == "yes" and email_sent != "yes":
+            email_address = row[email_idx].strip()
+            buyer_name = row[name_idx].strip()
+            generate_ticket(email_address, "Spoke", buyer_name, i)
+
+
+
+process_verified_tickets()
