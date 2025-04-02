@@ -1,14 +1,16 @@
 /**
  * Verify a QR code by calling the secure server-side API
  * @param ticketId The ticket ID from the scanned QR code
- * @returns Promise with verification result
+ * @returns Promise with verification result including scan status
  */
 export async function verifyQrCode(ticketId: string): Promise<{
   valid: boolean
+  alreadyScanned?: boolean
+  message?: string
   details?: {
     emailAddress?: string
     eventName?: string
-    buyerName?: string // Added buyerName to the result details
+    buyerName?: string
   }
 }> {
   try {
@@ -30,8 +32,9 @@ export async function verifyQrCode(ticketId: string): Promise<{
       console.error(`Server error (${response.status}):`, errorText)
       return {
         valid: false,
+        message: `Server error: ${response.status}`,
         details: {
-          emailAddress: `Server error: ${response.status}`,
+          emailAddress: "Verification failed",
         },
       }
     }
@@ -39,20 +42,22 @@ export async function verifyQrCode(ticketId: string): Promise<{
     const result = await response.json()
     console.log("Verification result from API:", result)
 
-    // Add buyerName to the details if available
-    const updatedResult = {
+    // Format the result to match our expected structure
+    return {
       valid: result.valid,
+      alreadyScanned: result.alreadyScanned || false,
+      message: result.message || result.warning,
       details: {
-        ...result.details,
-        buyerName: result.details?.buyerName || "Unknown buyer", // Include buyer name if available
+        emailAddress: result.details?.emailAddress,
+        eventName: result.details?.eventName,
+        buyerName: result.details?.buyerName || "Unknown buyer",
       }
     }
-
-    return updatedResult
   } catch (error) {
     console.error("Error in verifyQrCode function:", error)
     return {
       valid: false,
+      message: "Network error during verification",
       details: {
         emailAddress: error instanceof Error ? error.message : "Unknown error",
       },

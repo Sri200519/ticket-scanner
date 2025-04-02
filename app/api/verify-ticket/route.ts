@@ -78,39 +78,70 @@ export async function POST(request: Request) {
     // Check if the ticket ID exists in the Firestore database
     try {
       const ticketRef = db.collection("Spoke 4-4").doc(ticketId)
-      const ticketDoc = await ticketRef.get()
-
-      console.log(`Ticket exists: ${ticketDoc.exists}`)
-
-      if (ticketDoc.exists) {
+      
+      // Use a transaction to ensure atomic read/write operations
+      const result = await db.runTransaction(async (transaction) => {
+        const ticketDoc = await transaction.get(ticketRef)
+        
+        if (!ticketDoc.exists) {
+          return { valid: false, alreadyScanned: false }
+        }
+        
         const ticketData = ticketDoc.data()
-        console.log("Ticket data:", ticketData)
-
-        return NextResponse.json({
+        const isAlreadyScanned = ticketData?.scanned === true
+        
+        if (!isAlreadyScanned) {
+          // Only update if not already scanned
+          transaction.update(ticketRef, {
+            scanned: true,
+            scannedAt: admin.firestore.FieldValue.serverTimestamp()
+          })
+        }
+        
+        return {
           valid: true,
+          alreadyScanned: isAlreadyScanned,
           details: {
             emailAddress: ticketData?.email_address || "No email provided",
             eventName: ticketData?.event_name || "No event name provided",
-            buyerName: ticketData?.buyer_name || "Unknown buyer", // Added buyerName to the response
-          },
-        })
-      } else {
+            buyerName: ticketData?.buyer_name || "Unknown buyer",
+          }
+        }
+      })
+
+      if (!result.valid) {
         console.log("Ticket is invalid or not found.")
         return NextResponse.json({
           valid: false,
-          details: {
-            emailAddress: "Ticket not found in database",
-          },
+          error: "Ticket not found in database",
         })
       }
+
+      if (result.alreadyScanned) {
+        console.log("Ticket was already scanned.")
+        return NextResponse.json({
+          valid: false,
+          alreadyScanned: true,
+          details: result.details,
+          warning: "This ticket was already scanned previously"
+        })
+      }
+
+      console.log("Ticket is valid and marked as scanned.")
+      return NextResponse.json({
+        valid: true,
+        alreadyScanned: false,
+        details: result.details
+      })
+
     } catch (error) {
-      console.error("Error querying Firestore:", error)
+      console.error("Error in transaction:", error)
       return NextResponse.json(
         {
           valid: false,
-          error: "Database query error",
+          error: "Database transaction error",
           details: {
-            emailAddress: "Error querying database",
+            emailAddress: "Error processing ticket scan",
           },
         },
         { status: 500 },

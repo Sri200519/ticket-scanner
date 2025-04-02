@@ -2,7 +2,7 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Camera, Check, X } from "lucide-react"
+import { Camera, Check, X, AlertTriangle } from "lucide-react"
 import QrScanner from "@/components/qr-scanner"
 import { verifyQrCode } from "../lib/verify-qr-code"
 
@@ -11,6 +11,7 @@ export default function Home() {
   const [result, setResult] = useState<{
     valid: boolean
     data: string
+    alreadyScanned?: boolean
     details?: {
       emailAddress?: string
       eventName?: string
@@ -28,6 +29,7 @@ export default function Home() {
         setResult({
           valid: verificationResult.valid,
           data,
+          alreadyScanned: verificationResult.alreadyScanned,
           details: verificationResult.details,
         })
       } catch (error) {
@@ -68,11 +70,36 @@ export default function Home() {
             </div>
           ) : result ? (
             <div className="space-y-4">
-              <div className={`flex flex-col p-6 rounded-lg ${result.valid ? "bg-green-500" : "bg-red-500"}`}>
+              <div className={`flex flex-col p-6 rounded-lg ${
+                result.valid 
+                  ? (result.alreadyScanned ? "bg-yellow-600" : "bg-green-500") 
+                  : "bg-red-500"
+              }`}>
                 <div className="flex items-center mb-4">
-                  {result.valid ? <Check className="h-10 w-10 text-white mr-4" /> : <X className="h-10 w-10 text-white mr-4" />}
-                  <h3 className="text-xl font-semibold text-white">{result.valid ? "Valid Ticket" : "Invalid Ticket"}</h3>
+                  {result.valid ? (
+                    result.alreadyScanned ? (
+                      <AlertTriangle className="h-10 w-10 text-white mr-4" />
+                    ) : (
+                      <Check className="h-10 w-10 text-white mr-4" />
+                    )
+                  ) : (
+                    <X className="h-10 w-10 text-white mr-4" />
+                  )}
+                  <h3 className="text-xl font-semibold text-white">
+                    {result.valid 
+                      ? (result.alreadyScanned ? "Already Scanned" : "Valid Ticket") 
+                      : "Invalid Ticket"}
+                  </h3>
                 </div>
+                
+                {result.alreadyScanned && (
+                  <div className="mb-4 p-3 rounded-lg bg-black bg-opacity-30">
+                    <p className="text-white text-center font-medium">
+                      This ticket was scanned previously
+                    </p>
+                  </div>
+                )}
+
                 <div className="text-lg font-medium text-white">
                   <p className="text-gray-200">Ticket ID: <span className="font-bold break-all">{result.data}</span></p>
                   {result.valid && result.details && (
@@ -100,7 +127,7 @@ export default function Home() {
         <CardFooter className="p-4 bg-gray-800">
           <Button
             onClick={startScanning}
-            className="w-full bg-red-600 text-white font-semibold py-3 rounded-lg"
+            className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg transition-colors"
             disabled={scanning || loading}
           >
             {scanning ? "Scanning..." : result ? "Scan Another Ticket" : "Start Scanning"}
