@@ -15,7 +15,7 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # Google Sheets API Setup
-SHEET_ID = "1kFzDXgzm5XrCbr7zvJd5vWgVyjdlfTBHZYReowJefqE"  # Google Sheet ID
+SHEET_ID = "1KBCa421om-6ZjfKB00NVoMnuiZP--m0K28ZnUd8fUx4"  # Google Sheet ID
 SHEET_NAME = "Form Responses 1"   # sheet's tab name
 
 google_credentials = Credentials.from_service_account_file(
@@ -71,8 +71,18 @@ def send_email_with_qr(email_address, event_name, buyer_name, qr_image_path):
     msg["From"] = sender_email
     msg["To"] = email_address
     msg["Subject"] = subject
-    msg.set_content(f"Dear {buyer_name},\n\nThank you for purchasing your ticket for {event_name}.\n\nAttached is your QR code for entry. Please have it ready at the door.\n\nBest regards,\nMass Mirchi Team")
+    msg.set_content(f"""Dear {buyer_name},
 
+    Thank you for purchasing your ticket for the {event_name}.
+
+    Attached is your QR code for entry. Please have it ready at the door.
+
+    Reminder, this QR code will only work one time, so don’t share it with anyone! For re-entry, there will be a separate mark given to you once you are inside.
+
+    Don’t forget to bring an ID, we’re looking forward to seeing you there!
+
+    Best regards,  
+    Mass Mirchi Team""")
     with open(qr_image_path, "rb") as f:
         img_data = f.read()
         msg.add_attachment(img_data, maintype="image", subtype="png", filename=f"ticket_{event_name}.png")
@@ -122,10 +132,10 @@ def process_verified_tickets():
     for i, row in enumerate(rows, start=2):  
         payment_verified = row[payment_idx].strip().lower()
         email_sent = row[sent_idx].strip().lower() if len(row) > sent_idx else ""
-
+        
+        email_address = row[email_idx].strip()
+        buyer_name = row[name_idx].strip()
         if payment_verified == "yes" and email_sent != "yes":
-            email_address = row[email_idx].strip()
-            buyer_name = row[name_idx].strip()
             generate_ticket(email_address, "SASA Night Afterparty at Spoke Live", buyer_name, i)
         elif payment_verified == "no":
             send_payment_verification_email(email_address, buyer_name)
