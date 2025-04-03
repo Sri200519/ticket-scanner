@@ -71,7 +71,7 @@ def send_email_with_qr(email_address, event_name, buyer_name, qr_image_path):
     msg["From"] = sender_email
     msg["To"] = email_address
     msg["Subject"] = subject
-    msg.set_content(f"Dear {buyer_name},\n\nThank you for purchasing your ticket for {event_name}.\n\nAttached is your QR code for entry.\n\nBest regards,\nMass Mirchi")
+    msg.set_content(f"Dear {buyer_name},\n\nThank you for purchasing your ticket for {event_name}.\n\nAttached is your QR code for entry. Please have it ready at the door.\n\nBest regards,\nMass Mirchi Team")
 
     with open(qr_image_path, "rb") as f:
         img_data = f.read()
@@ -126,8 +126,36 @@ def process_verified_tickets():
         if payment_verified == "yes" and email_sent != "yes":
             email_address = row[email_idx].strip()
             buyer_name = row[name_idx].strip()
-            generate_ticket(email_address, "Spoke", buyer_name, i)
+            generate_ticket(email_address, "SASA Night Afterparty at Spoke Live", buyer_name, i)
+        elif payment_verified == "no":
+            send_payment_verification_email(email_address, buyer_name)
 
+def send_payment_verification_email(email_address, buyer_name):
+    sender_email = "skopparapu19@gmail.com"  
+    sender_password = "dwfs wafe lqpz mxny"
+    subject = "Payment Verification Required for Your Ticket"
+    
+    msg = EmailMessage()
+    msg["From"] = sender_email
+    msg["To"] = email_address
+    msg["Subject"] = subject
+    msg.set_content(f"""
+    Dear {buyer_name},
+
+    We have not yet verified your payment for the SASA Night Afterparty at Spoke Live. 
+    If you have already made the payment, please send us a screenshot of the transaction.
+    If not, kindly complete your payment at your earliest convenience.
+
+    Best regards,
+    Mass Mirchi Team
+    """)
+    
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+    
+    print(f"Payment verification email sent to {email_address}.")
 
 
 process_verified_tickets()
