@@ -1,3 +1,4 @@
+from selectors import EVENT_READ
 import firebase_admin
 from firebase_admin import credentials, firestore
 import qrcode
@@ -17,6 +18,7 @@ db = firestore.client()
 # Google Sheets API Setup
 SHEET_ID = "1KBCa421om-6ZjfKB00NVoMnuiZP--m0K28ZnUd8fUx4"  # Google Sheet ID
 SHEET_NAME = "Form Responses 1"   # sheet's tab name
+EVENT_NAME= 'Spoke 4-4'
 
 google_credentials = Credentials.from_service_account_file(
     "/Users/srikar/mirchi-ticket-website/google-sheets-key.json",
@@ -51,7 +53,7 @@ def generate_qr_code(ticket_id):
 
 def save_ticket_to_db(ticket_id, email_address, event_name, buyer_name, qr_code_path):
     """Save ticket details to Firestore."""
-    ticket_ref = db.collection('Spoke 4-4').document(ticket_id)
+    ticket_ref = db.collection(EVENT_NAME).document(ticket_id)
     ticket_ref.set({
         'ticket_id': ticket_id,
         'email_address': email_address,
@@ -98,16 +100,33 @@ def update_sheet_status(row_index):
     """Mark the email as sent in the 'Sent' column."""
     sheet.update_cell(row_index, sent_idx + 1, "Yes")  # Adding 1 because Sheets is 1-indexed
 
+def update_analytics(event_name, buyer_name, email_address):
+    """Update analytics in Firestore when a ticket is sent."""
+    try:
+        analytics_ref = db.collection('analytics').document(event_name)
+        analytics_ref.set({
+            'event_name': event_name,
+            'tickets_sent': firestore.Increment(1),
+            'last_updated': firestore.SERVER_TIMESTAMP,
+            'recipients': firestore.ArrayUnion([{
+                'email': email_address,
+                'name': buyer_name,
+                'timestamp': firestore.SERVER_TIMESTAMP
+            }])
+        }, merge=True)
+        print(f"Updated analytics for {event_name}")
+    except Exception as e:
+        print(f"Error updating analytics: {str(e)}")
+
 def generate_ticket(email_address, event_name, buyer_name, row_index):
     """Generate a ticket, save QR code, store details in Firestore, and send an email."""
     ticket_id = generate_ticket_id()
     qr_image_path = generate_qr_code(ticket_id)
 
     save_ticket_to_db(ticket_id, email_address, event_name, buyer_name, qr_image_path)
-
     send_email_with_qr(email_address, event_name, buyer_name, qr_image_path)
-
     update_sheet_status(row_index)
+    update_analytics(event_name, buyer_name, email_address)
 
     print(f"Ticket generated and emailed successfully! Ticket ID: {ticket_id}")
 
@@ -137,7 +156,7 @@ def process_verified_tickets():
         buyer_name = row[name_idx].strip()
         if payment_verified == "yes" and email_sent != "yes":
             generate_ticket(email_address, "SASA Night Afterparty at Spoke Live", buyer_name, i)
-        elif payment_verified == "no":
+        elif payment_verified == "no" and email_sent != "yes":
             send_payment_verification_email(email_address, buyer_name)
 
 def send_payment_verification_email(email_address, buyer_name):
@@ -152,7 +171,7 @@ def send_payment_verification_email(email_address, buyer_name):
     msg.set_content(f"""
     Dear {buyer_name},
 
-    We have not yet verified your payment for the SASA Night Afterparty at Spoke Live. 
+    We have not yet verified your payment for the Spoke Live Party. 
     If you have already made the payment, please send us a screenshot of the transaction.
     If not, kindly complete your payment at your earliest convenience.
 
@@ -169,3 +188,5 @@ def send_payment_verification_email(email_address, buyer_name):
 
 
 process_verified_tickets()
+
+

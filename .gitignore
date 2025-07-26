@@ -26,5 +26,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Firebase Admin key
+firebase-admin-key.json
+# Other service account keys
 mirchi-ticket-website.json
 google-sheets-key.json
+tickets/*
+.DS_Store

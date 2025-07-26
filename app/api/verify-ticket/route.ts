@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import admin from "firebase-admin"
+const EVENT_NAME = 'Spoke 4-4'
 
 // Initialize Firebase Admin SDK if not already initialized
 let app
@@ -77,13 +78,31 @@ export async function POST(request: Request) {
 
     // Check if the ticket ID exists in the Firestore database
     try {
-      const ticketRef = db.collection("Spoke 4-4").doc(ticketId)
+      const ticketRef = db.collection(EVENT_NAME).doc(ticketId)
       
       // Use a transaction to ensure atomic read/write operations
       const result = await db.runTransaction(async (transaction) => {
         const ticketDoc = await transaction.get(ticketRef)
         
         if (!ticketDoc.exists) {
+          // Track invalid ticket scan attempt
+          const now = admin.firestore.Timestamp.now()
+          const hourTimestamp = new Date(now.toDate())
+          hourTimestamp.setMinutes(0, 0, 0)
+          const hourKey = hourTimestamp.toISOString()
+          const eventName = 'unknown_event' // Default for invalid scans
+          
+          // Update invalid scans for this event
+          const invalidScansRef = db.collection('analytics')
+            .doc(eventName)
+            .collection('invalid_scans')
+            .doc(hourKey)
+          
+          transaction.set(invalidScansRef, {
+            count: admin.firestore.FieldValue.increment(1),
+            last_updated: now
+          }, { merge: true })
+          
           return { valid: false, alreadyScanned: false }
         }
         
@@ -91,11 +110,29 @@ export async function POST(request: Request) {
         const isAlreadyScanned = ticketData?.scanned === true
         
         if (!isAlreadyScanned) {
-          // Only update if not already scanned
+          const now = admin.firestore.Timestamp.now()
+          const hourTimestamp = new Date(now.toDate())
+          hourTimestamp.setMinutes(0, 0, 0) // Round down to nearest hour
+          
+          const hourKey = hourTimestamp.toISOString()
+          const eventName = ticketData?.event_name || 'unknown_event'
+          
+          // Update the ticket scan status
           transaction.update(ticketRef, {
             scanned: true,
-            scannedAt: admin.firestore.FieldValue.serverTimestamp()
+            scannedAt: now
           })
+          
+          // Update valid scans for this event
+          const validScansRef = db.collection('analytics')
+            .doc(eventName)
+            .collection('valid_scans')
+            .doc(hourKey)
+          
+          transaction.set(validScansRef, {
+            count: admin.firestore.FieldValue.increment(1),
+            last_updated: now
+          }, { merge: true })
         }
         
         return {
