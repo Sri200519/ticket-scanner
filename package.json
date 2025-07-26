@@ -10,6 +10,7 @@
     "seed:analytics": "ts-node --project tsconfig.json ./scripts/seed-analytics.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "^6.27.1",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-alert-dialog": "^1.1.4",

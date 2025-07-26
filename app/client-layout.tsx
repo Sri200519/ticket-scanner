@@ -5,6 +5,7 @@ import './globals.css';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { ClerkProvider, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from '@clerk/nextjs';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,11 +23,12 @@ export default function ClientLayout({
   }, [pathname]);
 
   return (
-    <html lang="en" className="h-full">
-      <head>
-        <link rel="icon" href="/MassMirchi.png" type="image/png" />
-      </head>
-      <body className={`${inter.className} min-h-screen bg-gray-900 text-cyan-300`}>
+    <ClerkProvider>
+      <html lang="en" className="h-full">
+        <head>
+          <link rel="icon" href="/MassMirchi.png" type="image/png" />
+        </head>
+        <body className={`${inter.className} min-h-screen bg-gray-900 text-cyan-300`}>
         {/* Header with Hamburger */}
         <header className="bg-black/80 backdrop-blur-md fixed w-full z-50 border-b border-cyan-500/30">
           <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -42,7 +44,14 @@ export default function ClientLayout({
             <h1 className="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
               {pathname === '/' ? 'Ticket Scanner' : 'Analytics'}
             </h1>
-            <div className="w-8"></div> {/* Spacer for alignment */}
+            <div className="flex items-center space-x-4">
+              <SignedIn>
+                <UserButton afterSignOutUrl="/" />
+              </SignedIn>
+              <SignedOut>
+                <SignInButton mode="modal" />
+              </SignedOut>
+            </div>
           </div>
 
           {/* Mobile Menu */}
@@ -76,7 +85,8 @@ export default function ClientLayout({
         <main className="pt-16 pb-8 min-h-screen">
           {children}
         </main>
-      </body>
-    </html>
+        </body>
+      </html>
+    </ClerkProvider>
   );
 }
