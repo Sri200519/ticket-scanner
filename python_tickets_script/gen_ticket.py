@@ -16,9 +16,9 @@ firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # Google Sheets API Setup
-SHEET_ID = "1KBCa421om-6ZjfKB00NVoMnuiZP--m0K28ZnUd8fUx4"  # Google Sheet ID
+SHEET_ID = "1nGY_KNOX65JY0JTu7SxScSpGaP3UwnJ1w7yzIOcnNAU"  # Google Sheet ID
 SHEET_NAME = "Form Responses 1"   # sheet's tab name
-EVENT_NAME= 'Spoke 4-4'
+EVENT_NAME= 'Gabes 9-13'
 
 google_credentials = Credentials.from_service_account_file(
     "/Users/srikar/mirchi-ticket-website/google-sheets-key.json",
@@ -155,7 +155,7 @@ def process_verified_tickets():
         email_address = row[email_idx].strip()
         buyer_name = row[name_idx].strip()
         if payment_verified == "yes" and email_sent != "yes":
-            generate_ticket(email_address, "SASA Night Afterparty at Spoke Live", buyer_name, i)
+            generate_ticket(email_address, "Mass Mirchi X Gabe's Underground Bollywood Party", buyer_name, i)
         elif payment_verified == "no" and email_sent != "yes":
             send_payment_verification_email(email_address, buyer_name)
 
@@ -171,7 +171,7 @@ def send_payment_verification_email(email_address, buyer_name):
     msg.set_content(f"""
     Dear {buyer_name},
 
-    We have not yet verified your payment for the Spoke Live Party. 
+    We have not yet verified your payment for the Mass Mirchi X Gabe's Underground Bollywood Party. 
     If you have already made the payment, please send us a screenshot of the transaction.
     If not, kindly complete your payment at your earliest convenience.
 
