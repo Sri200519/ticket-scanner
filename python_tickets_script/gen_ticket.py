@@ -1,3 +1,4 @@
+from datetime import datetime
 from selectors import EVENT_READ
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -18,7 +19,7 @@ db = firestore.client()
 # Google Sheets API Setup
 SHEET_ID = "1nGY_KNOX65JY0JTu7SxScSpGaP3UwnJ1w7yzIOcnNAU"  # Google Sheet ID
 SHEET_NAME = "Form Responses 1"   # sheet's tab name
-EVENT_NAME= 'Gabes 9-13'
+EVENT_NAME= 'Gabes 9-12'
 
 google_credentials = Credentials.from_service_account_file(
     "/Users/srikar/mirchi-ticket-website/google-sheets-key.json",
@@ -75,7 +76,7 @@ def send_email_with_qr(email_address, event_name, buyer_name, qr_image_path):
     msg["Subject"] = subject
     msg.set_content(f"""Dear {buyer_name},
 
-    Thank you for purchasing your ticket for the {event_name}.
+    Thank you for purchasing your ticket for the {event_name} for Sepetember 12th.
 
     Attached is your QR code for entry. Please have it ready at the door.
 
@@ -111,7 +112,7 @@ def update_analytics(event_name, buyer_name, email_address):
             'recipients': firestore.ArrayUnion([{
                 'email': email_address,
                 'name': buyer_name,
-                'timestamp': firestore.SERVER_TIMESTAMP
+                'timestamp': datetime.utcnow()
             }])
         }, merge=True)
         print(f"Updated analytics for {event_name}")

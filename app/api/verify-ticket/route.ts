@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import admin from "firebase-admin"
-const EVENT_NAME = 'Gabes 9-13'
+const EVENT_NAME = 'Gabes 9-12'
 
 // Initialize Firebase Admin SDK if not already initialized
 let app
