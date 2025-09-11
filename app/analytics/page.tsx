@@ -123,10 +123,11 @@ export default function Analytics() {
       const invalidHourStats: Record<string, number> = {};
       let lastUpdated: Date | null = null;
       let eventStatus = 'active';
+      
 
       // Loop through each event ID to aggregate data
       for (const eventId of eventIds) {
-        // 1. Get event metadata (ticket counts)
+        // 1. Get ticket/event metadata
         const eventDoc = await getDoc(doc(db, 'analytics', eventId));
         if (eventDoc.exists()) {
           const data = eventDoc.data() as EventData;
@@ -141,27 +142,19 @@ export default function Analytics() {
             eventStatus = data.status || 'active';
           }
         }
-
-        // 2. Process valid scans for the event
+      
+        // 2. Aggregate valid scans
         const validScansSnapshot = await getDocs(collection(db, `analytics/${eventId}/valid_scans`));
         validScansSnapshot.forEach(scanDoc => {
           const data = scanDoc.data() as ScanData;
-          const count = data.count || 0;
-          totalValidScans += count;
-          const timestamp = data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date(data.timestamp as string);
-          const hour = formatHour(timestamp);
-          hourStats[hour] = (hourStats[hour] || 0) + count;
+          totalValidScans += Number(data.count) || 0;
         });
-
-        // 3. Process invalid scans for the event
+      
+        // 3. Aggregate invalid scans
         const invalidScansSnapshot = await getDocs(collection(db, `analytics/${eventId}/invalid_scans`));
         invalidScansSnapshot.forEach(scanDoc => {
           const data = scanDoc.data() as ScanData;
-          const count = data.count || 0;
-          totalInvalidScans += count;
-          const timestamp = data.timestamp instanceof Timestamp ? data.timestamp.toDate() : new Date(data.timestamp as string);
-          const hour = formatHour(timestamp);
-          invalidHourStats[hour] = (invalidHourStats[hour] || 0) + count;
+          totalInvalidScans += Number(data.count) || 0;
         });
       }
 
@@ -307,7 +300,8 @@ export default function Analytics() {
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-gray-400">Total Capacity</span>
-                  <span className="text-sm font-medium">{stats.totalTickets.toLocaleString()}</span>
+                  <span className="text-sm font-medium">{Number(stats.totalTickets)/10}</span>
+
                 </div>
                 <div className="h-px bg-gray-700"></div>
                 <div className="flex justify-between items-center">
@@ -353,22 +347,20 @@ export default function Analytics() {
                 <div className="flex justify-between text-xs">
                   <span>Pre-sent:</span>
                   <span className="text-green-400">
-                    {typeof stats.ticketsSent === 'number' ? stats.ticketsSent.toLocaleString() : '0'}
+                    {Number(stats.ticketsSent)}
                   </span>
                 </div>
                 <div className="flex justify-between text-xs">
                   <span>At Door:</span>
                   <span className="text-blue-400">
-                    {typeof stats.atDoorTickets === 'number' ? stats.atDoorTickets.toLocaleString() : '0'}
+                    {Number(stats.atDoorTickets)}
                   </span>
                 </div>
                 <div className="h-px bg-gray-700 my-1"></div>
                 <div className="flex justify-between text-xs font-medium">
                   <span>Total sent:</span>
                   <span>
-                    {typeof stats.ticketsSent === 'number' && typeof stats.atDoorTickets === 'number' 
-                      ? (stats.ticketsSent + stats.atDoorTickets).toLocaleString() 
-                      : '0'}
+                    {Number(stats.ticketsSent) + Number(stats.atDoorTickets)}
                   </span>
                 </div>
               </div>
