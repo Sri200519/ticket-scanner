@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Camera, Check, X, AlertTriangle } from "lucide-react"
@@ -19,11 +19,25 @@ export default function Home() {
     }
   } | null>(null)
   const [loading, setLoading] = useState(false)
+  const lastScannedRef = useRef<string>('')
+  const scanTimeoutRef = useRef<number | null>(null)
 
   const handleScan = async (data: string) => {
-    if (data && !loading) {
+    // Skip if already processing or if we've seen this code recently
+    if (loading || !data || data === lastScannedRef.current) return
+    
+    // Clear any pending timeouts
+    if (scanTimeoutRef.current !== null) {
+      clearTimeout(scanTimeoutRef.current)
+      scanTimeoutRef.current = null
+    }
+    
+    // Set a new timeout to process the scan
+    scanTimeoutRef.current = window.setTimeout(async () => {
+      lastScannedRef.current = data
       setLoading(true)
       setScanning(false)
+      
       try {
         const verificationResult = await verifyQrCode(data)
         setResult({
@@ -42,8 +56,17 @@ export default function Home() {
       } finally {
         setLoading(false)
       }
-    }
+    }, 300) // 300ms debounce time
   }
+
+  // Cleanup effect for timeouts
+  useEffect(() => {
+    return () => {
+      if (scanTimeoutRef.current !== null) {
+        clearTimeout(scanTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const startScanning = () => {
     setScanning(true)
