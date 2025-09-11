@@ -81,59 +81,73 @@ export async function POST(request: Request) {
       const ticketRef = db.collection(EVENT_NAME).doc(ticketId)
       
       // Use a transaction to ensure atomic read/write operations
+      const now = admin.firestore.Timestamp.now(); // Move now to the top of the transaction
       const result = await db.runTransaction(async (transaction) => {
         const ticketDoc = await transaction.get(ticketRef)
         
         if (!ticketDoc.exists) {
-          // Track invalid ticket scan attempt
-          const now = admin.firestore.Timestamp.now()
           const hourTimestamp = new Date(now.toDate())
           hourTimestamp.setMinutes(0, 0, 0)
           const hourKey = hourTimestamp.toISOString()
-          const eventName = 'unknown_event' // Default for invalid scans
-          
-          // Update invalid scans for this event
+          const eventName = 'unknown_event'
+          const safeEventName = eventName.replace(/\//g, "_") // <- already sanitized
+        
           const invalidScansRef = db.collection('analytics')
-            .doc(eventName)
+            .doc(safeEventName)
             .collection('invalid_scans')
             .doc(hourKey)
-          
+        
           transaction.set(invalidScansRef, {
             count: admin.firestore.FieldValue.increment(1),
-            last_updated: now
+            last_updated: now,
+            timestamp: now
           }, { merge: true })
-          
+        
           return { valid: false, alreadyScanned: false }
         }
+        
+        
         
         const ticketData = ticketDoc.data()
         const isAlreadyScanned = ticketData?.scanned === true
         
+        // If already scanned in this transaction, return immediately
+        if (ticketData?.scanned && ticketData.scannedAt?.toMillis() === now.toMillis()) {
+          return {
+            valid: true,
+            alreadyScanned: true,
+            details: {
+              emailAddress: ticketData?.email_address || "No email provided",
+              eventName: ticketData?.event_name || "No event name provided",
+              buyerName: ticketData?.buyer_name || "Unknown buyer",
+            }
+          };
+        }
+        
         if (!isAlreadyScanned) {
-          const now = admin.firestore.Timestamp.now()
           const hourTimestamp = new Date(now.toDate())
-          hourTimestamp.setMinutes(0, 0, 0) // Round down to nearest hour
-          
+          hourTimestamp.setMinutes(0, 0, 0)
           const hourKey = hourTimestamp.toISOString()
-          const eventName = ticketData?.event_name || 'unknown_event'
-          
-          // Update the ticket scan status
+          const safeEventName = EVENT_NAME.replace(/\//g, "_")
+        
           transaction.update(ticketRef, {
             scanned: true,
             scannedAt: now
           })
-          
-          // Update valid scans for this event
+        
           const validScansRef = db.collection('analytics')
-            .doc(eventName)
+            .doc(safeEventName)
             .collection('valid_scans')
             .doc(hourKey)
-          
+        
           transaction.set(validScansRef, {
             count: admin.firestore.FieldValue.increment(1),
-            last_updated: now
+            last_updated: now,
+            timestamp: now // <-- ADD THIS
           }, { merge: true })
         }
+        
+        
         
         return {
           valid: true,
