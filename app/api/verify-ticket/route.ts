@@ -147,7 +147,28 @@ export async function POST(request: Request) {
           }, { merge: true })
         }
         
+        if (isAlreadyScanned) {
+          const hourTimestamp = new Date(now.toDate())
+          hourTimestamp.setMinutes(0, 0, 0)
+          const hourKey = hourTimestamp.toISOString()
+          const safeEventName = EVENT_NAME.replace(/\//g, "_")
         
+          transaction.update(ticketRef, {
+            scanned: true,
+            scannedAt: now
+          })
+        
+          const invalidScansRef = db.collection('analytics')
+            .doc(safeEventName)
+            .collection('invalid_scans')
+            .doc(hourKey)
+        
+          transaction.set(invalidScansRef, {
+            count: admin.firestore.FieldValue.increment(1),
+            last_updated: now,
+            timestamp: now // <-- ADD THIS
+          }, { merge: true })
+        }
         
         return {
           valid: true,

@@ -1,5 +1,6 @@
 from datetime import datetime
 from selectors import EVENT_READ
+import time  # noqa: F401
 import firebase_admin
 from firebase_admin import credentials, firestore
 import qrcode
@@ -10,6 +11,11 @@ import ssl
 from email.message import EmailMessage
 import gspread
 from google.oauth2.service_account import Credentials
+from email.utils import make_msgid
+import mimetypes
+import ssl
+import smtplib
+from email.message import EmailMessage
 
 cred = credentials.Certificate("/Users/srikar/mirchi-ticket-website/mirchi-ticket-website.json")
 firebase_admin.initialize_app(cred)
@@ -65,37 +71,48 @@ def save_ticket_to_db(ticket_id, email_address, event_name, buyer_name, qr_code_
     print(f"Ticket saved to Firestore with ticket ID: {ticket_id}")
 
 def send_email_with_qr(email_address, event_name, buyer_name, qr_image_path):
-    """Send an email with the QR code attached."""
-    sender_email = "skopparapu19@gmail.com"  
-    sender_password = "dwfs wafe lqpz mxny" 
+    sender_email = "skopparapu19@gmail.com"
+    sender_password = "dwfs wafe lqpz mxny"
     subject = f"Your Ticket for {event_name}"
 
+    # Create EmailMessage object
     msg = EmailMessage()
     msg["From"] = sender_email
     msg["To"] = email_address
     msg["Subject"] = subject
-    msg.set_content(f"""Dear {buyer_name},
 
-    Thank you for purchasing your ticket for the {event_name} for Sepetember 12th.
+    # Generate Content-ID for the image
+    image_cid = make_msgid(domain="massmirchi.org")[1:-1]  # remove < and >
 
-    Attached is your QR code for entry. Please have it ready at the door.
+    # Set HTML content with inline image
+    msg.set_content(f"Dear {buyer_name}, please view your QR code in HTML email.")  # plain text fallback
+    msg.add_alternative(f"""\
+    <html>
+      <body>
+        <p>Dear {buyer_name},</p>
+        <p>Thank you for purchasing your ticket for the {event_name} on September 12th.</p>
+        <p>Here is your QR code for entry:</p>
+        <img src="cid:{image_cid}" alt="QR Code" style="width:300px;height:300px;">
+        <p>Reminder: this QR code will only work one time, so don’t share it!</p>
+        <p>Best regards,<br>Mass Mirchi Team</p>
+      </body>
+    </html>
+    """, subtype="html")
 
-    Reminder, this QR code will only work one time, so don’t share it with anyone! For re-entry, there will be a separate mark given to you once you are inside.
+    # Read the QR code image and attach it as inline
+    with open(qr_image_path, "rb") as img_file:
+        img_data = img_file.read()
+        maintype, subtype = mimetypes.guess_type(qr_image_path)[0].split("/")
+        msg.get_payload()[1].add_related(img_data, maintype=maintype, subtype=subtype, cid=image_cid)
 
-    Don’t forget to bring an ID, we’re looking forward to seeing you there!
-
-    Best regards,  
-    Mass Mirchi Team""")
-    with open(qr_image_path, "rb") as f:
-        img_data = f.read()
-        msg.add_attachment(img_data, maintype="image", subtype="png", filename=f"ticket_{event_name}.png")
-
+    # Send the email
     context = ssl.create_default_context()
     with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
         server.login(sender_email, sender_password)
         server.send_message(msg)
 
-    print(f"Email sent to {email_address} with QR code attachment.")
+    print(f"Email sent to {email_address} with inline QR code.")
+
 
 def update_sheet_status(row_index):
     """Mark the email as sent in the 'Sent' column."""
@@ -156,9 +173,11 @@ def process_verified_tickets():
         email_address = row[email_idx].strip()
         buyer_name = row[name_idx].strip()
         if payment_verified == "yes" and email_sent != "yes":
-            generate_ticket(email_address, "Mass Mirchi X Gabe's Underground Bollywood Party", buyer_name, i)
+            generate_ticket(email_address, "Mass Mirchi X Gabe's Underground Bollywood Party 9/12", buyer_name, i)
+            time.sleep(3)
         elif payment_verified == "no" and email_sent != "yes":
             send_payment_verification_email(email_address, buyer_name)
+            time.sleep(3)
 
 def send_payment_verification_email(email_address, buyer_name):
     sender_email = "skopparapu19@gmail.com"  
