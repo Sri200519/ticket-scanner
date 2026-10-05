@@ -76,9 +76,28 @@ export async function POST(request: Request) {
 
     const db = admin.firestore()
 
-    // Check if the ticket ID exists in the Firestore database
+    // Determine event collection name dynamically
+    const configuredEventName = (process.env.EVENT_NAME || 'Os 10-17').replace(/^["']|["']$/g, "").trim()
+    let targetEventName = configuredEventName
+    let ticketRef = db.collection(targetEventName).doc(ticketId)
+
+    // Check if the ticket ID exists in the configured event collection; if not, search all collections
     try {
-      const ticketRef = db.collection(EVENT_NAME).doc(ticketId)
+      const initialDoc = await ticketRef.get()
+      if (!initialDoc.exists) {
+        console.log(`Ticket ${ticketId} not in ${targetEventName}, searching other collections...`)
+        const collections = await db.listCollections()
+        for (const col of collections) {
+          if (col.id === 'analytics' || col.id === targetEventName) continue
+          const candidateDoc = await col.doc(ticketId).get()
+          if (candidateDoc.exists) {
+            console.log(`Found ticket ${ticketId} in collection: ${col.id}`)
+            targetEventName = col.id
+            ticketRef = col.doc(ticketId)
+            break
+          }
+        }
+      }
 
       // Use a transaction to ensure atomic read/write operations
       const now = admin.firestore.Timestamp.now(); // Move now to the top of the transaction
@@ -106,10 +125,9 @@ export async function POST(request: Request) {
           return { valid: false, alreadyScanned: false }
         }
 
-
-
         const ticketData = ticketDoc.data()
         const isAlreadyScanned = ticketData?.scanned === true
+        const eventName = ticketData?.event_name || targetEventName
 
         // If already scanned in this transaction, return immediately
         if (ticketData?.scanned && ticketData.scannedAt?.toMillis() === now.toMillis()) {
@@ -118,18 +136,18 @@ export async function POST(request: Request) {
             alreadyScanned: true,
             details: {
               emailAddress: ticketData?.email_address || "No email provided",
-              eventName: ticketData?.event_name || "No event name provided",
+              eventName: eventName,
               buyerName: ticketData?.buyer_name || "Unknown buyer",
             }
           };
         }
 
-        if (!isAlreadyScanned) {
-          const hourTimestamp = new Date(now.toDate())
-          hourTimestamp.setMinutes(0, 0, 0)
-          const hourKey = hourTimestamp.toISOString()
-          const safeEventName = EVENT_NAME.replace(/\//g, "_")
+        const safeEventName = (ticketData?.event_name || targetEventName).replace(/\//g, "_")
+        const hourTimestamp = new Date(now.toDate())
+        hourTimestamp.setMinutes(0, 0, 0)
+        const hourKey = hourTimestamp.toISOString()
 
+        if (!isAlreadyScanned) {
           transaction.update(ticketRef, {
             scanned: true,
             scannedAt: now
@@ -143,16 +161,11 @@ export async function POST(request: Request) {
           transaction.set(validScansRef, {
             count: admin.firestore.FieldValue.increment(1),
             last_updated: now,
-            timestamp: now // <-- ADD THIS
+            timestamp: now
           }, { merge: true })
         }
 
         if (isAlreadyScanned) {
-          const hourTimestamp = new Date(now.toDate())
-          hourTimestamp.setMinutes(0, 0, 0)
-          const hourKey = hourTimestamp.toISOString()
-          const safeEventName = EVENT_NAME.replace(/\//g, "_")
-
           transaction.update(ticketRef, {
             scanned: true,
             scannedAt: now
@@ -166,7 +179,7 @@ export async function POST(request: Request) {
           transaction.set(invalidScansRef, {
             count: admin.firestore.FieldValue.increment(1),
             last_updated: now,
-            timestamp: now // <-- ADD THIS
+            timestamp: now
           }, { merge: true })
         }
 
@@ -175,7 +188,7 @@ export async function POST(request: Request) {
           alreadyScanned: isAlreadyScanned,
           details: {
             emailAddress: ticketData?.email_address || "No email provided",
-            eventName: ticketData?.event_name || "No event name provided",
+            eventName: eventName,
             buyerName: ticketData?.buyer_name || "Unknown buyer",
           }
         }
