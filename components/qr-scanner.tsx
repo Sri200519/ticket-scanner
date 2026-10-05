@@ -15,31 +15,48 @@ export default function QrScanner({ onScan }: QrScannerProps) {
   useEffect(() => {
     const video = videoRef.current
     const canvas = canvasRef.current
+    let animationFrameId: number | null = null
+    let stream: MediaStream | null = null
+    let cancelled = false
 
     if (!video || !canvas) return
 
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    // Request camera access
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-      })
-      .then((stream) => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setError("Camera access is not available. Open this page over HTTPS in Safari or Chrome and allow camera access.")
+      return
+    }
+
+    const startCamera = async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "environment",
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
+        })
+
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop())
+          return
+        }
+
         video.srcObject = stream
         video.setAttribute("playsinline", "true") // required for iOS
-        video.play()
-        requestAnimationFrame(tick)
-      })
-      .catch((err) => {
-        setError("Camera access denied or not available")
-        console.error("Error accessing camera:", err)
-      })
+        await video.play()
+        animationFrameId = requestAnimationFrame(tick)
+      } catch (err) {
+        if (!cancelled) {
+          setError("Camera access denied or not available")
+          console.error("Error accessing camera:", err)
+        }
+      }
+    }
+
+    void startCamera()
 
     function tick() {
       if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
@@ -74,15 +91,14 @@ export default function QrScanner({ onScan }: QrScannerProps) {
           }
         }
       }
-      requestAnimationFrame(tick)
+      animationFrameId = requestAnimationFrame(tick)
     }
 
     return () => {
-      // Clean up video stream when component unmounts
-      if (video.srcObject) {
-        const tracks = (video.srcObject as MediaStream).getTracks()
-        tracks.forEach((track) => track.stop())
-      }
+      cancelled = true
+      if (animationFrameId !== null) cancelAnimationFrame(animationFrameId)
+      stream?.getTracks().forEach((track) => track.stop())
+      video.srcObject = null
     }
   }, [onScan])
 
