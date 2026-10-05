@@ -2,8 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+  color-scheme: dark;
+  background: #0b0b0b;
+}
+
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  background: #0b0b0b;
+}
+
+::selection {
+  background: rgba(220, 38, 38, 0.35);
+  color: #fff;
+}
+
+* {
+  scrollbar-color: #3f3f46 #0b0b0b;
+  scrollbar-width: thin;
 }
 
 @layer utilities {

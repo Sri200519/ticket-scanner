@@ -10,6 +10,19 @@ import {
   DocumentData
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase-config';
+import {
+  Activity,
+  BarChart3,
+  CheckCircle2,
+  Clock3,
+  DoorOpen,
+  RefreshCw,
+  ScanLine,
+  TicketCheck,
+  TicketX,
+  Users,
+  type LucideIcon,
+} from 'lucide-react';
 
 // --- TYPE DEFINITIONS ---
 interface EventData {
@@ -79,13 +92,42 @@ export default function Analytics() {
       setLoading(true);
       try {
         const eventsSnapshot = await getDocs(collection(db, 'analytics'));
-        const eventList = eventsSnapshot.docs.map(doc => doc.id).filter(Boolean);
         
-        if (eventList.length > 0) {
-          setEvents(['all', ...eventList]);
-          setSelectedEvent(eventList[0]); // Default to the first event
+        // Extract events with recency timestamp for sorting
+        const eventItems = eventsSnapshot.docs
+          .map(doc => {
+            const data = doc.data() as EventData;
+            let timeVal = 0;
+            if (data.last_updated && typeof (data.last_updated as any).toDate === 'function') {
+              timeVal = (data.last_updated as any).toDate().getTime();
+            } else if (data.last_updated instanceof Date) {
+              timeVal = data.last_updated.getTime();
+            } else if (typeof data.last_updated === 'string') {
+              timeVal = new Date(data.last_updated).getTime();
+            }
+            return {
+              id: doc.id,
+              timeVal,
+            };
+          })
+          .filter(item => Boolean(item.id));
+
+        // Sort events in descending order (most recent first)
+        eventItems.sort((a, b) => b.timeVal - a.timeVal);
+        const sortedEventIds = eventItems.map(item => item.id);
+
+        const currentEnvEvent = (process.env.NEXT_PUBLIC_EVENT_NAME || '').replace(/^["']|["']$/g, '').trim();
+
+        if (sortedEventIds.length > 0) {
+          setEvents(['all', ...sortedEventIds]);
+          // Default to the current configured event if present, otherwise the most recent event
+          if (currentEnvEvent && sortedEventIds.includes(currentEnvEvent)) {
+            setSelectedEvent(currentEnvEvent);
+          } else {
+            setSelectedEvent(sortedEventIds[0]); // Most recent event
+          }
         } else {
-          setEvents(['all']); // Still allow 'all' even if no events found
+          setEvents(['all']);
           setSelectedEvent('all');
           console.warn('No events found in Firestore.');
         }
@@ -201,194 +243,269 @@ export default function Analytics() {
 
   // --- RENDER LOGIC ---
 
-  // Stat card component
   interface StatCardProps {
     title: string;
     value: string | number;
-    color?: 'green' | 'red' | 'cyan' | 'yellow' | 'purple';
-    tooltip?: string;
+    note: string;
+    icon: LucideIcon;
+    color?: 'green' | 'red' | 'amber' | 'white';
   }
 
-  const StatCard = ({ title, value, color, tooltip }: StatCardProps) => (
-    <div className="aspect-square bg-gray-800/50 border border-cyan-500/20 rounded-xl p-4 backdrop-blur-sm relative group flex flex-col justify-between">
-      <div className="flex justify-between items-start">
-        <h3 className="text-xs sm:text-sm font-medium text-gray-400 line-clamp-2">{title}</h3>
-        {tooltip && (
-          <div className="text-gray-500 hover:text-gray-300 cursor-help flex-shrink-0 ml-1">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div className="hidden group-hover:block absolute z-10 w-48 p-2 mt-1 -ml-2 text-xs text-gray-200 bg-gray-900 rounded shadow-lg">
-              {tooltip}
+  const StatCard = ({ title, value, note, icon: Icon, color = 'white' }: StatCardProps) => {
+    const tone = color === 'green'
+      ? 'bg-emerald-500/10 text-emerald-400'
+      : color === 'red'
+        ? 'bg-red-500/10 text-red-400'
+        : color === 'amber'
+          ? 'bg-amber-500/10 text-amber-400'
+          : 'bg-white/[0.06] text-zinc-300';
+
+    return (
+      <div className="rounded-2xl border border-white/[0.08] bg-[#151515] p-5 shadow-[0_16px_45px_rgba(0,0,0,0.16)]">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">{title}</p>
+            <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white">{value}</p>
+          </div>
+          <div className={`flex h-10 w-10 flex-none items-center justify-center rounded-xl ${tone}`}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+        <p className="mt-4 text-xs text-zinc-500">{note}</p>
+      </div>
+    );
+  };
+
+  return (
+    <main className="relative min-h-[calc(100vh-72px)] overflow-hidden px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
+      <div className="pointer-events-none absolute -right-48 -top-48 h-[32rem] w-[32rem] rounded-full bg-red-600/[0.06] blur-3xl" aria-hidden="true" />
+
+      <div className="relative mx-auto max-w-7xl">
+        <div className="flex flex-col gap-6 border-b border-white/[0.07] pb-7 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.2em] text-red-500">
+              <BarChart3 className="h-4 w-4" />
+              Live reporting
             </div>
+            <h1 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">Event analytics</h1>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-zinc-500 sm:text-base">
+              A real-time view of arrivals, scan quality, and ticket distribution.
+            </p>
+          </div>
+
+          <div className="flex w-full items-center gap-2 lg:w-auto">
+            <div className="relative min-w-0 flex-1 lg:w-64 lg:flex-none">
+              <label htmlFor="event-select" className="sr-only">Select Event</label>
+              <select
+                id="event-select"
+                value={selectedEvent}
+                onChange={(e) => setSelectedEvent(e.target.value)}
+                className="h-11 w-full appearance-none rounded-xl border border-white/10 bg-[#171717] px-4 pr-9 text-sm font-medium capitalize text-zinc-200 outline-none transition-colors focus:border-red-500/50 disabled:opacity-50"
+                disabled={loading}
+              >
+                {events.map((event) => (
+                  <option key={event} value={event}>
+                    {event === 'all' ? 'All Events' : event.replace(/_/g, ' ')}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-600">▼</span>
+            </div>
+
+            <button
+              onClick={() => fetchAnalytics()}
+              disabled={loading}
+              className="flex h-11 flex-none items-center justify-center gap-2 rounded-xl bg-red-600 px-4 text-sm font-semibold text-white shadow-[0_8px_24px_rgba(220,38,38,0.18)] transition-all hover:-translate-y-0.5 hover:bg-red-700 disabled:translate-y-0 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {loading && !stats.totalTickets ? (
+          <div className="grid min-h-[28rem] place-items-center">
+            <div className="text-center">
+              <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-white/10 border-t-red-500" />
+              <p className="mt-4 text-sm font-medium text-zinc-400">Loading analytics...</p>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-7 space-y-4">
+            <section className="grid gap-4 lg:grid-cols-[1.45fr_0.55fr]">
+              <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#151515] p-6 sm:p-8">
+                <div className="absolute right-0 top-0 h-48 w-48 translate-x-1/3 -translate-y-1/3 rounded-full bg-red-600/10 blur-3xl" />
+                <div className="relative">
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Event overview</p>
+                      <h2 className="mt-3 max-w-lg text-2xl font-semibold capitalize tracking-[-0.035em] text-white sm:text-3xl">
+                        {selectedEvent === 'all' ? 'All events combined' : selectedEvent.replace(/_/g, ' ')}
+                      </h2>
+                    </div>
+                    <div className="flex w-fit items-center gap-2 rounded-full border border-emerald-500/15 bg-emerald-500/[0.08] px-3 py-1.5 text-xs font-semibold capitalize text-emerald-400">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                      {stats.eventStatus}
+                    </div>
+                  </div>
+
+                  <div className="mt-10 grid grid-cols-3 divide-x divide-white/[0.08]">
+                    <div className="pr-3 sm:pr-6">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600 sm:text-xs">Capacity</p>
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-4xl">{Number(stats.totalTickets).toLocaleString()}</p>
+                    </div>
+                    <div className="px-3 sm:px-6">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600 sm:text-xs">Checked in</p>
+                      <p className="mt-2 text-2xl font-semibold tracking-tight text-white sm:text-4xl">{stats.validScans.toLocaleString()}</p>
+                    </div>
+                    <div className="pl-3 sm:pl-6">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-600 sm:text-xs">Remaining</p>
+                      <p className={`mt-2 text-2xl font-semibold tracking-tight sm:text-4xl ${stats.notScanned > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                        {stats.notScanned.toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-8">
+                    <div className="mb-2 flex items-center justify-between text-xs">
+                      <span className="text-zinc-500">Check-in progress</span>
+                      <span className="font-semibold text-zinc-300">{stats.scanRate}</span>
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                      <div className="h-full rounded-full bg-red-600 transition-[width] duration-700" style={{ width: stats.scanRate }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col justify-between rounded-3xl border border-white/[0.08] bg-[#151515] p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Last sync</p>
+                    <p className="mt-3 text-lg font-semibold text-white">
+                      {stats.lastUpdated ? stats.lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'No timestamp'}
+                    </p>
+                    <p className="mt-1 text-xs text-zinc-600">
+                      {stats.lastUpdated ? stats.lastUpdated.toLocaleDateString() : 'Waiting for event data'}
+                    </p>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.05] text-zinc-400">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                </div>
+                <div className="mt-10 border-t border-white/[0.07] pt-5">
+                  <p className="text-xs leading-5 text-zinc-500">Analytics automatically refresh every 15 minutes.</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <StatCard
+                title="Total scans"
+                value={stats.totalScans.toLocaleString()}
+                note="All verification attempts"
+                icon={ScanLine}
+                color="amber"
+              />
+              <StatCard
+                title="Invalid scans"
+                value={stats.invalidScans.toLocaleString()}
+                note="Rejected ticket attempts"
+                icon={TicketX}
+                color="red"
+              />
+              <StatCard
+                title="Scan rate"
+                value={stats.scanRate}
+                note="Issued tickets checked in"
+                icon={TicketCheck}
+                color={parseInt(stats.scanRate) >= 80 ? 'green' : 'amber'}
+              />
+              <StatCard
+                title="Success rate"
+                value={stats.successRate}
+                note="Valid scans across attempts"
+                icon={CheckCircle2}
+                color={parseInt(stats.successRate) >= 95 ? 'green' : 'red'}
+              />
+            </section>
+
+            <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="rounded-3xl border border-white/[0.08] bg-[#151515] p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Ticket distribution</p>
+                    <h3 className="mt-2 text-lg font-semibold text-white">How guests received tickets</h3>
+                  </div>
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
+                    <Users className="h-5 w-5" />
+                  </div>
+                </div>
+
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-zinc-500">Pre-sent</span>
+                      <TicketCheck className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{Number(stats.ticketsSent)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/[0.06] bg-black/20 p-5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-zinc-500">At the door</span>
+                      <DoorOpen className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <p className="mt-4 text-3xl font-semibold tracking-tight text-white">{Number(stats.atDoorTickets)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex items-center justify-between border-t border-white/[0.07] pt-4 text-sm">
+                  <span className="text-zinc-500">Total sent</span>
+                  <span className="font-semibold text-white">{Number(stats.ticketsSent) + Number(stats.atDoorTickets)}</span>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/[0.08] bg-[#151515] p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-500">Operational insights</p>
+                <div className="mt-5 divide-y divide-white/[0.07]">
+                  <div className="flex items-center justify-between gap-4 pb-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.05] text-zinc-400">
+                        <Clock3 className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-200">Busiest hour</p>
+                        <p className="mt-0.5 text-xs text-zinc-600">
+                          {stats.busiestHour.count > 0 ? `${stats.busiestHour.count} scans` : 'No data yet'}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-lg font-semibold text-white">
+                      {stats.busiestHour.count > 0 ? stats.busiestHour.hour : '--:--'}
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 pt-5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-400">
+                        <TicketX className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-zinc-200">Most invalid scans</p>
+                        <p className="mt-0.5 text-xs text-zinc-600">
+                          {stats.mostInvalidHour.count > 0 ? `${stats.mostInvalidHour.count} attempts` : 'No data yet'}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-lg font-semibold text-white">
+                      {stats.mostInvalidHour.count > 0 ? stats.mostInvalidHour.hour : '--:--'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         )}
       </div>
-      <p className={`text-xl sm:text-2xl font-bold text-center ${
-        color === 'green' ? 'text-green-400' : 
-        color === 'red' ? 'text-red-400' : 
-        color === 'cyan' ? 'text-cyan-400' : 
-        color === 'yellow' ? 'text-yellow-400' : 
-        'text-cyan-400'
-      }`}>
-        {value}
-      </p>
-      <div className="h-1 w-full bg-gray-700 rounded-full overflow-hidden">
-        <div 
-          className={`h-full ${
-            color === 'green' ? 'bg-green-500' : 
-            color === 'red' ? 'bg-red-500' : 
-            color === 'cyan' ? 'bg-cyan-500' : 
-            color === 'yellow' ? 'bg-yellow-500' : 'bg-cyan-500'
-          }`}
-          style={{ width: '100%' }}
-        />
-      </div>
-    </div>
-  );
-
-  return (
-    <div className="container mx-auto px-2 sm:px-4 py-4 sm:py-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 gap-3">
-        <h2 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-          Event Analytics
-        </h2>
-        
-        <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
-          <div className="flex-1 sm:flex-none">
-            <label htmlFor="event-select" className="sr-only">Select Event</label>
-            <select
-              id="event-select"
-              value={selectedEvent}
-              onChange={(e) => setSelectedEvent(e.target.value)}
-              className="w-full sm:w-auto text-sm sm:text-base p-2 rounded-md bg-gray-800 border border-gray-600 text-white disabled:opacity-50"
-              disabled={loading}
-            >
-              {events.map((event) => (
-                <option key={event} value={event}>
-                  {event === 'all' ? 'All Events' : event.replace(/_/g, ' ')}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <button
-            onClick={() => fetchAnalytics()}
-            disabled={loading}
-            className="px-3 sm:px-4 py-2 bg-cyan-600/80 hover:bg-cyan-500/80 text-white rounded-lg transition-colors disabled:opacity-50 flex items-center gap-1 sm:gap-2 text-sm sm:text-base"
-          >
-            <svg className="w-3 h-3 sm:w-4 sm:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            <span className="hidden sm:inline">Refresh</span>
-          </button>
-        </div>
-      </div>
-
-      {loading && !stats.totalTickets ? (
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-pulse text-cyan-400">Loading Analytics...</div>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {/* Main Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 sm:gap-3">
-            {/* Core Metrics */}
-            <div className="col-span-2 row-span-2 bg-gray-800/50 border border-cyan-500/20 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-cyan-300 mb-3">Event Overview</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Total Capacity</span>
-                  <span className="text-sm font-medium">{Number(stats.totalTickets)/10}</span>
-
-                </div>
-                <div className="h-px bg-gray-700"></div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Valid Scans</span>
-                  <span className="text-sm font-medium">{stats.validScans.toLocaleString()}</span>
-                </div>
-                <div className="h-px bg-gray-700"></div>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-400">Not Scanned</span>
-                  <span className={`text-sm font-medium ${stats.notScanned > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                    {stats.notScanned.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Scan Stats */}
-            <StatCard 
-              title="Total Scans" 
-              value={stats.totalScans.toLocaleString()}
-              color="yellow"
-            />
-            <StatCard 
-              title="Invalid Scans" 
-              value={stats.invalidScans.toLocaleString()}
-              color="red"
-            />
-            <StatCard 
-              title="Scan Rate" 
-              value={stats.scanRate}
-              color={parseInt(stats.scanRate) >= 80 ? 'green' : 'yellow'}
-            />
-            <StatCard 
-              title="Success Rate" 
-              value={stats.successRate}
-              color={parseInt(stats.successRate) >= 95 ? 'green' : 'red'}
-            />
-
-            {/* Ticket Sales */}
-            <div className="col-span-2 bg-gray-800/50 border border-cyan-500/20 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-cyan-300 mb-3">Ticket Sales</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Pre-sent:</span>
-                  <span className="text-green-400">
-                    {Number(stats.ticketsSent)}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs">
-                  <span>At Door:</span>
-                  <span className="text-blue-400">
-                    {Number(stats.atDoorTickets)}
-                  </span>
-                </div>
-                <div className="h-px bg-gray-700 my-1"></div>
-                <div className="flex justify-between text-xs font-medium">
-                  <span>Total sent:</span>
-                  <span>
-                    {Number(stats.ticketsSent) + Number(stats.atDoorTickets)}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Busy Hours */}
-            <div className="bg-gray-800/50 border border-cyan-500/20 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-cyan-300 mb-2">Busiest Hour</h3>
-              <p className="text-lg font-bold text-cyan-400">
-                {stats.busiestHour.count > 0 ? stats.busiestHour.hour : '--:--'}
-              </p>
-              <p className="text-xs text-gray-400">
-                {stats.busiestHour.count > 0 ? `${stats.busiestHour.count} scans` : 'No data'}
-              </p>
-            </div>
-
-            <div className="bg-gray-800/50 border border-red-500/20 rounded-xl p-4">
-              <h3 className="text-xs font-semibold text-red-300 mb-2">Most Invalid Scans</h3>
-              <p className="text-lg font-bold text-red-400">
-                {stats.mostInvalidHour.count > 0 ? stats.mostInvalidHour.hour : '--:--'}
-              </p>
-              <p className="text-xs text-gray-400">
-                {stats.mostInvalidHour.count > 0 ? `${stats.mostInvalidHour.count} attempts` : 'No data'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </main>
   );
 }
