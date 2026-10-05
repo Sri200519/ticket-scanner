@@ -17,18 +17,68 @@ import ssl
 import smtplib
 from email.message import EmailMessage
 
-cred = credentials.Certificate("/Users/srikar/mirchi-ticket-website/mirchi-ticket-website.json")
-firebase_admin.initialize_app(cred)
+def load_env():
+    try:
+        from dotenv import load_dotenv
+        env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env.local")
+        if os.path.exists(env_path):
+            load_dotenv(dotenv_path=env_path)
+            return
+    except ImportError:
+        pass
+
+    candidates = [
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env.local"),
+        os.path.join(os.getcwd(), ".env.local"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env.local"),
+    ]
+    for env_path in candidates:
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, val = line.split("=", 1)
+                    key = key.strip()
+                    val = val.strip()
+                    if (val.startswith('"') and val.endswith('"')) or (val.startswith("'") and val.endswith("'")):
+                        val = val[1:-1]
+                    if key not in os.environ:
+                        os.environ[key] = val
+            break
+
+load_env()
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+firebase_key_path = os.getenv(
+    "FIREBASE_KEY_PATH",
+    os.path.join(PROJECT_ROOT, "mirchi-ticket-website.json")
+    if os.path.exists(os.path.join(PROJECT_ROOT, "mirchi-ticket-website.json"))
+    else "/Users/srikar/mirchi-ticket-website/mirchi-ticket-website.json"
+)
+
+cred = credentials.Certificate(firebase_key_path)
+if not firebase_admin._apps:
+    firebase_admin.initialize_app(cred)
 
 db = firestore.client()
 
-# Google Sheets API Setup
-SHEET_ID = "1nGY_KNOX65JY0JTu7SxScSpGaP3UwnJ1w7yzIOcnNAU"  # Google Sheet ID
-SHEET_NAME = "Form Responses 1"   # sheet's tab name
-EVENT_NAME= 'Gabes 9-12'
+# Google Sheets API & Event Setup
+SHEET_ID = os.getenv("SHEET_ID", "1nGY_KNOX65JY0JTu7SxScSpGaP3UwnJ1w7yzIOcnNAU")  # Google Sheet ID
+SHEET_NAME = os.getenv("SHEET_NAME", "Form Responses 1")   # sheet's tab name
+EVENT_NAME = os.getenv("EVENT_NAME", "Gabes 9-12")
+
+sheets_key_path = os.getenv(
+    "GOOGLE_SHEETS_KEY_PATH",
+    os.path.join(PROJECT_ROOT, "google-sheets-key.json")
+    if os.path.exists(os.path.join(PROJECT_ROOT, "google-sheets-key.json"))
+    else "/Users/srikar/mirchi-ticket-website/google-sheets-key.json"
+)
 
 google_credentials = Credentials.from_service_account_file(
-    "/Users/srikar/mirchi-ticket-website/google-sheets-key.json",
+    sheets_key_path,
     scopes=["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
 )
 gc = gspread.authorize(google_credentials)
@@ -173,13 +223,13 @@ def process_verified_tickets():
         email_address = row[email_idx].strip()
         buyer_name = row[name_idx].strip()
         if payment_verified == "yes" and email_sent != "yes":
-            generate_ticket(email_address, "Mass Mirchi X Gabe's Underground Bollywood Party 9/12", buyer_name, i)
+            generate_ticket(email_address, EVENT_NAME, buyer_name, i)
             time.sleep(3)
         elif payment_verified == "no" and email_sent != "yes":
             send_payment_verification_email(email_address, buyer_name)
             time.sleep(3)
 
-def send_payment_verification_email(email_address, buyer_name):
+def send_payment_verification_email(email_address, buyer_name, event_name=EVENT_NAME):
     sender_email = "skopparapu19@gmail.com"  
     sender_password = "dwfs wafe lqpz mxny"
     subject = "Payment Verification Required for Your Ticket"
@@ -191,7 +241,7 @@ def send_payment_verification_email(email_address, buyer_name):
     msg.set_content(f"""
     Dear {buyer_name},
 
-    We have not yet verified your payment for the Mass Mirchi X Gabe's Underground Bollywood Party. 
+    We have not yet verified your payment for {event_name}. 
     If you have already made the payment, please send us a screenshot of the transaction.
     If not, kindly complete your payment at your earliest convenience.
 
@@ -207,6 +257,7 @@ def send_payment_verification_email(email_address, buyer_name):
     print(f"Payment verification email sent to {email_address}.")
 
 
-process_verified_tickets()
+if __name__ == "__main__":
+    process_verified_tickets()
 
 
