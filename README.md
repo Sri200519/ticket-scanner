@@ -122,6 +122,11 @@ Ensure you have set up the necessary environment variables for Firebase in your 
 FIREBASE_PROJECT_ID=your-project-id
 FIREBASE_CLIENT_EMAIL=your-client-email@your-project-id.iam.gserviceaccount.com
 FIREBASE_PRIVATE_KEY=your-private-key
+
+# Google Sheets & Event Configuration
+SHEET_ID=your-google-sheet-id
+SHEET_NAME=Form Responses 1
+EVENT_NAME=your-event-name
 ```
 
 ### 9. Build and Deploy

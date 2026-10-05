@@ -33,3 +33,8 @@ mirchi-ticket-website.json
 google-sheets-key.json
 tickets/*
 .DS_Store
+*.pem
+.venv/
+venv/
+__pycache__/
+*.pyc
