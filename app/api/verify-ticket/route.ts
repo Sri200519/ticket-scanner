@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 import admin from "firebase-admin"
-const EVENT_NAME = process.env.EVENT_NAME || 'Gabes 9-12'
+const EVENT_NAME = process.env.EVENT_NAME || 'Os 10-17'
 
 // Initialize Firebase Admin SDK if not already initialized
 let app
@@ -79,38 +79,38 @@ export async function POST(request: Request) {
     // Check if the ticket ID exists in the Firestore database
     try {
       const ticketRef = db.collection(EVENT_NAME).doc(ticketId)
-      
+
       // Use a transaction to ensure atomic read/write operations
       const now = admin.firestore.Timestamp.now(); // Move now to the top of the transaction
       const result = await db.runTransaction(async (transaction) => {
         const ticketDoc = await transaction.get(ticketRef)
-        
+
         if (!ticketDoc.exists) {
           const hourTimestamp = new Date(now.toDate())
           hourTimestamp.setMinutes(0, 0, 0)
           const hourKey = hourTimestamp.toISOString()
           const eventName = 'unknown_event'
           const safeEventName = eventName.replace(/\//g, "_") // <- already sanitized
-        
+
           const invalidScansRef = db.collection('analytics')
             .doc(safeEventName)
             .collection('invalid_scans')
             .doc(hourKey)
-        
+
           transaction.set(invalidScansRef, {
             count: admin.firestore.FieldValue.increment(1),
             last_updated: now,
             timestamp: now
           }, { merge: true })
-        
+
           return { valid: false, alreadyScanned: false }
         }
-        
-        
-        
+
+
+
         const ticketData = ticketDoc.data()
         const isAlreadyScanned = ticketData?.scanned === true
-        
+
         // If already scanned in this transaction, return immediately
         if (ticketData?.scanned && ticketData.scannedAt?.toMillis() === now.toMillis()) {
           return {
@@ -123,53 +123,53 @@ export async function POST(request: Request) {
             }
           };
         }
-        
+
         if (!isAlreadyScanned) {
           const hourTimestamp = new Date(now.toDate())
           hourTimestamp.setMinutes(0, 0, 0)
           const hourKey = hourTimestamp.toISOString()
           const safeEventName = EVENT_NAME.replace(/\//g, "_")
-        
+
           transaction.update(ticketRef, {
             scanned: true,
             scannedAt: now
           })
-        
+
           const validScansRef = db.collection('analytics')
             .doc(safeEventName)
             .collection('valid_scans')
             .doc(hourKey)
-        
+
           transaction.set(validScansRef, {
             count: admin.firestore.FieldValue.increment(1),
             last_updated: now,
             timestamp: now // <-- ADD THIS
           }, { merge: true })
         }
-        
+
         if (isAlreadyScanned) {
           const hourTimestamp = new Date(now.toDate())
           hourTimestamp.setMinutes(0, 0, 0)
           const hourKey = hourTimestamp.toISOString()
           const safeEventName = EVENT_NAME.replace(/\//g, "_")
-        
+
           transaction.update(ticketRef, {
             scanned: true,
             scannedAt: now
           })
-        
+
           const invalidScansRef = db.collection('analytics')
             .doc(safeEventName)
             .collection('invalid_scans')
             .doc(hourKey)
-        
+
           transaction.set(invalidScansRef, {
             count: admin.firestore.FieldValue.increment(1),
             last_updated: now,
             timestamp: now // <-- ADD THIS
           }, { merge: true })
         }
-        
+
         return {
           valid: true,
           alreadyScanned: isAlreadyScanned,
